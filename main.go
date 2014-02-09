@@ -2,12 +2,16 @@ package main
 
 import (
 	. "github.com/bitly/go-simplejson"
+	"github.com/hoisie/web"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"runtime"
+	//"runtime"
+	"strconv"
 	"time"
 )
+
+const TICK = 30
 
 const (
 	CNY = iota
@@ -40,22 +44,41 @@ func init() {
 		},
 		{
 			symbol: "ltc_btc",
-			from:   2,
-			to:     1,
+			from:   1,
+			to:     2,
 		},
 	}
 }
 
+func MakeAbitrage() {
+
+	/* CNY -> BTC -> LTC */
+	log.Println(M[0][1], M[1][2], M[2][0])
+	factor := M[0][1] * M[1][2] * M[2][0]
+
+	log.Println(factor)
+	if factor < 1 && factor != 0 {
+		log.Panicln("haha CNY -> BTC -> LTC")
+	}
+	/* CNY -> LTC -> BTC */
+	factor = M[0][2] * M[2][1] * M[1][0]
+
+	log.Println(factor)
+	if factor < 1 && factor != 0 {
+		log.Panicln("haha CNY -> LTC -> BTC")
+	}
+}
+
 func main() {
-	runtime.GOMAXPROCS(3)
 	log.Println("FXBTC Starts")
-	changed := make(chan string)
+	changed := make(chan int)
 
 	go func() {
-		var who string
+		var tid int
 		for {
-			who = <-changed
-			log.Println(who, " changed")
+			tid = <-changed
+			log.Println(T[tid].symbol, " changed")
+			MakeAbitrage()
 		}
 	}()
 	//for {
@@ -63,7 +86,7 @@ func main() {
 		log.Println("Goroutine")
 		for i := 0; ; i = (i + 1) % 3 {
 			select {
-			case <-time.Tick(time.Second * 10):
+			case <-time.Tick(time.Second * TICK):
 				{
 					log.Println("Request")
 					resp, _ := http.Get("https://data.fxbtc.com/api?op=query_ticker&symbol=" + T[i].symbol)
@@ -80,7 +103,7 @@ func main() {
 					if M[T[i].from][T[i].to] != ask || M[T[i].to][T[i].from] != 1.0/bid {
 						M[T[i].from][T[i].to] = ask
 						M[T[i].to][T[i].from] = 1.0 / bid
-						changed <- T[i].symbol
+						changed <- i
 					}
 				}
 			}
@@ -88,8 +111,12 @@ func main() {
 
 	}()
 
-	//}
-	for {
+	web.Get("/(.*)", hello)
+	web.Run("0.0.0.0:7777")
+}
 
-	}
+func hello(ctx *web.Context, val string) string {
+	abitrage1 := strconv.FormatFloat(M[0][1]*M[1][2]*M[2][0], 'f', 6, 64)
+	abitrage2 := strconv.FormatFloat(M[0][2]*M[2][1]*M[1][0], 'f', 6, 64)
+	return "hello: A1: " + abitrage1 + " A2: " + abitrage2 + val
 }
