@@ -29,6 +29,7 @@ type ticker struct {
 /* global market matrix */
 var M [MAX][MAX]float64
 var T [MAX]ticker
+var Log string
 
 func init() {
 	T = [MAX]ticker{
@@ -58,14 +59,17 @@ func MakeAbitrage() {
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
-		log.Panicln("haha CNY -> BTC -> LTC")
+		log.Println("haha CNY -> BTC -> LTC")
+		Log = strconv.FormatFloat(M[0][1]*M[1][2]*M[2][0], 'f', 6, 64)
 	}
 	/* CNY -> LTC -> BTC */
 	factor = M[0][2] * M[2][1] * M[1][0]
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
-		log.Panicln("haha CNY -> LTC -> BTC")
+		log.Println("haha CNY -> LTC -> BTC")
+		Log = strconv.FormatFloat(M[0][2]*M[2][1]*M[1][0], 'f', 6, 64)
+
 	}
 }
 
@@ -89,11 +93,19 @@ func main() {
 			case <-time.Tick(time.Second * TICK):
 				{
 					log.Println("Request")
-					resp, _ := http.Get("https://data.fxbtc.com/api?op=query_ticker&symbol=" + T[i].symbol)
+					resp, err := http.Get("https://data.fxbtc.com/api?op=query_ticker&symbol=" + T[i].symbol)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 					defer resp.Body.Close()
 
 					body, _ := ioutil.ReadAll(resp.Body)
-					js, _ := NewJson(body)
+					js, err := NewJson(body)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 
 					ask, _ := js.Get("ticker").Get("ask").Float64()
 					bid, _ := js.Get("ticker").Get("bid").Float64()
@@ -118,5 +130,5 @@ func main() {
 func hello(ctx *web.Context, val string) string {
 	abitrage1 := strconv.FormatFloat(M[0][1]*M[1][2]*M[2][0], 'f', 6, 64)
 	abitrage2 := strconv.FormatFloat(M[0][2]*M[2][1]*M[1][0], 'f', 6, 64)
-	return "hello: A1: " + abitrage1 + " A2: " + abitrage2 + val
+	return "hello: A1: " + abitrage1 + " A2: " + abitrage2 + " LOG:" + Log + val
 }
