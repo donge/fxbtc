@@ -12,6 +12,7 @@ import (
 )
 
 const TICK = 30
+const RATE = 0.998
 
 const (
 	CNY = iota
@@ -55,20 +56,20 @@ func MakeAbitrage() {
 
 	/* CNY -> BTC -> LTC */
 	log.Println(M[0][1], M[1][2], M[2][0])
-	factor := M[0][1] * M[1][2] * M[2][0]
+	factor := M[0][1] * RATE * M[1][2] * RATE * M[2][0] * RATE
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
-		log.Println("haha CNY -> BTC -> LTC")
-		Log = strconv.FormatFloat(M[0][1]*M[1][2]*M[2][0], 'f', 6, 64)
+		log.Println("MakeAbitrage CNY -> BTC -> LTC")
+		Log = strconv.FormatFloat(factor, 'f', 6, 64)
 	}
 	/* CNY -> LTC -> BTC */
-	factor = M[0][2] * M[2][1] * M[1][0]
+	factor = M[0][2] * RATE * M[2][1] * RATE * M[1][0] * RATE
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
-		log.Println("haha CNY -> LTC -> BTC")
-		Log = strconv.FormatFloat(M[0][2]*M[2][1]*M[1][0], 'f', 6, 64)
+		log.Println("MakeAbitrage CNY -> LTC -> BTC")
+		Log = strconv.FormatFloat(factor, 'f', 6, 64)
 
 	}
 }
@@ -76,6 +77,17 @@ func MakeAbitrage() {
 func main() {
 	log.Println("FXBTC Starts")
 	changed := make(chan int)
+
+	GetToken()
+	go func() {
+		for {
+			select {
+			case <-time.Tick(time.Second * 60000):
+				GetToken()
+			}
+		}
+	}()
+	log.Println(GetAccount())
 
 	go func() {
 		var tid int
@@ -124,7 +136,7 @@ func main() {
 	}()
 
 	web.Get("/(.*)", hello)
-	web.Run("0.0.0.0:7777")
+	web.Run("0.0.0.0:6666")
 }
 
 func hello(ctx *web.Context, val string) string {
