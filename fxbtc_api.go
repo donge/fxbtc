@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	. "github.com/bitly/go-simplejson"
 	"io/ioutil"
@@ -22,8 +20,8 @@ import (
 var (
 	ACCESS_KEY = "API 访问密匙 (Access Key)"
 	SECURT_KEY = "API 秘密密匙 (Secret Key)"
-	USERNAME   = "donge"
-	PASSWORD   = "831116"
+	USERNAME   = "USERNAME"
+	PASSWORD   = "PASSWORD"
 	TOKEN      = ""
 )
 
@@ -73,7 +71,7 @@ func GetMarket() (float64, float64, float64, error) {
 	return last, buy, sell, err
 }
 
-func GetAccount() (buying bool, cny float64, btc float64, ltc float64, err error) {
+func GetAccount() (cny float64, btc float64, ltc float64, err error) {
 
 	client := &http.Client{}
 
@@ -87,14 +85,14 @@ func GetAccount() (buying bool, cny float64, btc float64, ltc float64, err error
 	req, err := http.NewRequest("POST", "https://trade.fxbtc.com/api", strings.NewReader(form.Encode()))
 	if err != nil {
 		log.Println(err)
-		return false, 0, 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
-		return false, 0, 0, 0, err
+		return 0, 0, 0, err
 	}
 	defer resp.Body.Close()
 	//......
@@ -103,7 +101,7 @@ func GetAccount() (buying bool, cny float64, btc float64, ltc float64, err error
 	fmt.Println(string(body), err)
 	if err != nil {
 		log.Println(err)
-		return false, 0, 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	js, err := NewJson(body)
@@ -130,32 +128,22 @@ func GetAccount() (buying bool, cny float64, btc float64, ltc float64, err error
 	btc, err = strconv.ParseFloat(btc_str, 64)
 	ltc, err = strconv.ParseFloat(ltc_str, 64)
 
-	if cny > 50 {
-		buying = true
-	} else if btc > 0.01 {
-		buying = false
-	} else {
-		CancelAllOrders()
-		time.Sleep(time.Second * 1)
-		return GetAccount()
+	fmt.Println(cny, btc, ltc)
 
-	}
-	fmt.Println(buying, cny, btc, ltc)
-
-	return buying, cny, btc, ltc, err
+	return cny, btc, ltc, err
 }
 
-func Buy(buy float64, btc float64) string {
-	fmt.Printf("%s: $$$ BUY %f at %f", time.Now(), btc, buy)
-	return MakeOrder(buy, btc, true)
+func Buy(buy float64, btc float64, symbol uint) string {
+	fmt.Printf("%s: $$$ BUY %f at %f -> %s", time.Now(), btc, buy, T[symbol].symbol)
+	return MakeOrder(buy, btc, symbol, true)
 }
 
-func Sell(sell float64, btc float64) string {
-	fmt.Printf("%s: $$$ SELL %f at %f", time.Now(), btc, sell)
-	return MakeOrder(sell, btc, false)
+func Sell(sell float64, btc float64, symbol uint) string {
+	fmt.Printf("%s: $$$ SELL %f at %f -> %s", time.Now(), btc, sell, T[symbol].symbol)
+	return MakeOrder(sell, btc, symbol, false)
 }
 
-func MakeOrder(price float64, amount float64, buying bool) (id string) {
+func MakeOrder(price float64, amount float64, symbol uint, buying bool) (id string) {
 	var buying_str string
 	if buying {
 		buying_str = "buy"
@@ -164,36 +152,26 @@ func MakeOrder(price float64, amount float64, buying bool) (id string) {
 	}
 
 	price_str := strconv.FormatFloat(price, 'f', 2, 64)
-	amount_str := strconv.FormatFloat(amount, 'f', 1, 64)
+	amount_str := strconv.FormatFloat(amount, 'f', 3, 64)
 
 	form := url.Values{
 		"token":  {TOKEN},
 		"op":     {"trade"},
-		"symbol": {"ltc_cny"},
-
+		"symbol": {T[symbol].symbol},
+		"type":   {buying_str},
 		"rate":   {price_str},
-		"amount": {amount_str},
+		"vol":    {amount_str},
 	}
 
-	//fmt.Println(form.Encode())
-	clear_text := form.Encode() + SECURT_KEY
-	h := md5.New()
-	h.Write([]byte(clear_text)) // 需要加密的字符串
-	suffix := strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
-
-	data := "partner=" + ACCESS_KEY + "&symbol=" + "ltc_cny" + "&type=" + buying_str +
-		"&rate=" + price_str + "&amount=" + amount_str + "&sign=" + suffix
-	//fmt.Println(data)
-	//data := "a=" + buying_str + "&price=" + strconv.FormatFloat(price, 'f', 2, 64) + "&amount=" + strconv.FormatFloat(amount, 'f', 3, 64)
-	client := &http.Client{}
-
-	req, err := http.NewRequest("POST", "https://www.okcoin.com/api/trade.do", strings.NewReader(data))
+	req, err := http.NewRequest("POST", "https://trade.fxbtc.com/api", strings.NewReader(form.Encode()))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	//req.AddCookie(gCurCookies[0])
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -208,31 +186,23 @@ func MakeOrder(price float64, amount float64, buying bool) (id string) {
 
 }
 
-func GetOrders() (src []string) {
+func GetOrders(symbol uint) (src []string) {
 
 	form := url.Values{
-		"partner":  {ACCESS_KEY},
-		"order_id": {"-1"},
-		"symbol":   {"ltc_cny"},
+		"token":  {TOKEN},
+		"op":     {"get_orders"},
+		"symbol": {T[symbol].symbol},
 	}
 
-	//fmt.Println(form.Encode())
-	clear_text := form.Encode() + SECURT_KEY
-	h := md5.New()
-	h.Write([]byte(clear_text)) // 需要加密的字符串
-	suffix := strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
-
-	data := "partner=" + ACCESS_KEY + "&order_id=-1&symbol=ltc_cny&sign=" + suffix
 	//fmt.Println(data)
-
-	req, err := http.NewRequest("POST", "https://www.okcoin.com/api/getorder.do", strings.NewReader(data))
+	req, err := http.NewRequest("POST", "https://trade.fxbtc.com/api", strings.NewReader(form.Encode()))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	//req.AddCookie(gCurCookies[0])
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -241,18 +211,16 @@ func GetOrders() (src []string) {
 	}
 	//fmt.Println(resp)
 	body, err := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(body))
 	defer resp.Body.Close()
-	//fmt.Println(string(body))
 
-	//re, _ := regexp.Compile(`cancel&id=\d*`)
-	//src = re.FindAllString(string(body), -1)
 	//fmt.Println(src)
 	js, err := NewJson(body)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	id, err := js.Get("orders").GetIndex(0).Get("orders_id").Int64()
+	id, err := js.Get("orders").GetIndex(0).Get("id").Int64()
 	if err != nil {
 		log.Println(err)
 		return
@@ -267,39 +235,35 @@ func GetOrders() (src []string) {
 
 func CancelAllOrders() {
 	Orderlist := make([]string, 10)
-	Orderlist = GetOrders()
 
-	for _, v := range Orderlist {
-		CancelOrder(v)
-		time.Sleep(time.Second)
+	for i := 0; i < 3; i++ {
+		Orderlist = GetOrders(uint(i))
+
+		for _, v := range Orderlist {
+			CancelOrder(v, uint(i))
+			time.Sleep(time.Second)
+		}
 	}
 }
 
-func CancelOrder(cancelID string) {
-	client := &http.Client{}
+func CancelOrder(cancelID string, symbol uint) {
 
 	form := url.Values{
-		"partner":  {ACCESS_KEY},
-		"order_id": {cancelID},
-		"symbol":   {"ltc_cny"},
+		"token":  {TOKEN},
+		"op":     {"cancel_order"},
+		"symbol": {T[symbol].symbol},
+		"id":     {cancelID},
 	}
 
-	//fmt.Println(form.Encode())
-	clear_text := form.Encode() + SECURT_KEY
-	h := md5.New()
-	h.Write([]byte(clear_text)) // 需要加密的字符串
-	suffix := strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
-
-	data := "partner=" + ACCESS_KEY + "&order_id=" + cancelID + "&symbol=ltc_cny&sign=" + suffix
-	//fmt.Println(data)
-
-	req, err := http.NewRequest("POST", "https://www.okcoin.com/api/cancelorder.do", strings.NewReader(data))
+	req, err := http.NewRequest("POST", "https://trade.fxbtc.com/api", strings.NewReader(form.Encode()))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	//req.AddCookie(gCurCookies[0])
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -308,6 +272,8 @@ func CancelOrder(cancelID string) {
 	//fmt.Println(resp)
 	body, err := ioutil.ReadAll(resp.Body)
 	fmt.Println(string(body))
+	defer resp.Body.Close()
+
 	return
 }
 

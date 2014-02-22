@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
+/* DASHAOZI 0.0.1 */
 const TICK = 30
-const RATE = 0.998
+const RATE = 1.002
 
 const (
 	CNY = iota
@@ -55,39 +56,84 @@ func init() {
 func MakeAbitrage() {
 
 	/* CNY -> BTC -> LTC */
-	log.Println(M[0][1], M[1][2], M[2][0])
-	factor := M[0][1] * RATE * M[1][2] * RATE * M[2][0] * RATE
+	factor := M[CNY][BTC] * RATE * M[BTC][LTC] * RATE * M[LTC][CNY] * RATE
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
 		log.Println("MakeAbitrage CNY -> BTC -> LTC")
+		log.Println(M[CNY][BTC], M[BTC][LTC], M[LTC][CNY])
 		Log = strconv.FormatFloat(factor, 'f', 6, 64)
+		MakeTrade(true)
 	}
 	/* CNY -> LTC -> BTC */
-	factor = M[0][2] * RATE * M[2][1] * RATE * M[1][0] * RATE
+	factor = M[CNY][LTC] * RATE * M[LTC][BTC] * RATE * M[BTC][CNY] * RATE
 
 	log.Println(factor)
 	if factor < 1 && factor != 0 {
 		log.Println("MakeAbitrage CNY -> LTC -> BTC")
+		log.Println(M[CNY][LTC], M[LTC][BTC], M[BTC][CNY])
 		Log = strconv.FormatFloat(factor, 'f', 6, 64)
-
+		MakeTrade(false)
 	}
+}
+
+func MakeTrade(dir bool) {
+
+	for i := 0; i < 3; i++ {
+		cny, btc, ltc, _ := GetAccount()
+		if dir == true {
+			if cny > 100 {
+				Buy(M[CNY][BTC], cny/M[CNY][BTC]-0.0001, 0)
+			}
+			if btc > 0.02 {
+				Buy(M[BTC][LTC], btc/M[BTC][LTC]-0.0001, 2)
+			}
+			if ltc > 1 {
+				Sell(M[LTC][CNY], ltc, 1)
+			}
+		} else {
+			if cny > 100 {
+				Buy(M[CNY][LTC], cny/M[CNY][LTC]-0.0001, 1)
+			}
+			if ltc > 1 {
+				Sell(M[LTC][BTC], ltc, 2)
+			}
+			if btc > 0.02 {
+				Sell(M[BTC][CNY], btc, 0)
+			}
+
+		}
+		time.Sleep(1)
+	}
+	CancelAllOrders()
 }
 
 func main() {
 	log.Println("FXBTC Starts")
 	changed := make(chan int)
 
+	/* Initial Configuration */
+	var cfg Config
+	var err error
+	err = LoadConfig(&cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	USERNAME = cfg.Email
+	PASSWORD = cfg.Password
+
 	GetToken()
 	go func() {
 		for {
 			select {
-			case <-time.Tick(time.Second * 60000):
+			case <-time.Tick(time.Second * 60):
 				GetToken()
 			}
 		}
 	}()
 	log.Println(GetAccount())
+	//Buy(0.02, 1, 1)
+	//CancelAllOrders()
 
 	go func() {
 		var tid int
@@ -140,7 +186,7 @@ func main() {
 }
 
 func hello(ctx *web.Context, val string) string {
-	abitrage1 := strconv.FormatFloat(M[0][1]*M[1][2]*M[2][0], 'f', 6, 64)
-	abitrage2 := strconv.FormatFloat(M[0][2]*M[2][1]*M[1][0], 'f', 6, 64)
+	abitrage1 := strconv.FormatFloat(M[CNY][BTC]*RATE*M[BTC][LTC]*RATE*M[LTC][CNY]*RATE, 'f', 6, 64)
+	abitrage2 := strconv.FormatFloat(M[CNY][LTC]*RATE*M[LTC][BTC]*RATE*M[BTC][CNY]*RATE, 'f', 6, 64)
 	return "hello: A1: " + abitrage1 + " A2: " + abitrage2 + " LOG:" + Log + val
 }
