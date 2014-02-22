@@ -126,7 +126,7 @@ func main() {
 	go func() {
 		for {
 			select {
-			case <-time.Tick(time.Second * 60):
+			case <-time.Tick(time.Second * 60000):
 				GetToken()
 			}
 		}
