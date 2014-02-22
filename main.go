@@ -58,21 +58,23 @@ func MakeAbitrage() {
 	/* CNY -> BTC -> LTC */
 	factor := M[CNY][BTC] * RATE * M[BTC][LTC] * RATE * M[LTC][CNY] * RATE
 
-	log.Println(factor)
+	//log.Println(factor)
 	if factor < 1 && factor != 0 {
 		log.Println("MakeAbitrage CNY -> BTC -> LTC")
 		log.Println(M[CNY][BTC], M[BTC][LTC], M[LTC][CNY])
 		Log = strconv.FormatFloat(factor, 'f', 6, 64)
+
 		MakeTrade(true)
 	}
 	/* CNY -> LTC -> BTC */
 	factor = M[CNY][LTC] * RATE * M[LTC][BTC] * RATE * M[BTC][CNY] * RATE
 
-	log.Println(factor)
+	//log.Println(factor)
 	if factor < 1 && factor != 0 {
 		log.Println("MakeAbitrage CNY -> LTC -> BTC")
 		log.Println(M[CNY][LTC], M[LTC][BTC], M[BTC][CNY])
 		Log = strconv.FormatFloat(factor, 'f', 6, 64)
+
 		MakeTrade(false)
 	}
 }
@@ -80,26 +82,34 @@ func MakeAbitrage() {
 func MakeTrade(dir bool) {
 
 	for i := 0; i < 3; i++ {
+		Log = Log + " Trading"
 		cny, btc, ltc, _ := GetAccount()
+		log.Println(i, cny, btc, ltc)
 		if dir == true {
 			if cny > 100 {
 				Buy(M[CNY][BTC], cny/M[CNY][BTC]-0.0001, 0)
+				Log = Log + " cny buy btc:" + strconv.FormatFloat((cny/M[CNY][BTC]-0.0001), 'f', 4, 64)
 			}
 			if btc > 0.02 {
 				Buy(M[BTC][LTC], btc/M[BTC][LTC]-0.0001, 2)
+				Log = Log + " btc buy ltc:" + strconv.FormatFloat((btc/M[BTC][LTC]-0.0001), 'f', 4, 64)
 			}
 			if ltc > 1 {
 				Sell(M[LTC][CNY], ltc, 1)
+				Log = Log + " ltc sell cny:" + strconv.FormatFloat((ltc), 'f', 4, 64)
 			}
 		} else {
 			if cny > 100 {
 				Buy(M[CNY][LTC], cny/M[CNY][LTC]-0.0001, 1)
+				Log = Log + " cny buy ltc:" + strconv.FormatFloat((cny/M[CNY][LTC]-0.0001), 'f', 4, 64)
 			}
 			if ltc > 1 {
 				Sell(M[LTC][BTC], ltc, 2)
+				Log = Log + " ltc sell btc:" + strconv.FormatFloat((ltc), 'f', 4, 64)
 			}
 			if btc > 0.02 {
 				Sell(M[BTC][CNY], btc, 0)
+				Log = Log + " btc sell cny:" + strconv.FormatFloat((btc), 'f', 4, 64)
 			}
 
 		}
@@ -150,7 +160,7 @@ func main() {
 			select {
 			case <-time.Tick(time.Second * TICK):
 				{
-					log.Println("Request")
+					//log.Println("Request")
 					resp, err := http.Get("https://data.fxbtc.com/api?op=query_ticker&symbol=" + T[i].symbol)
 					if err != nil {
 						log.Println(err)
@@ -168,7 +178,7 @@ func main() {
 					ask, _ := js.Get("ticker").Get("ask").Float64()
 					bid, _ := js.Get("ticker").Get("bid").Float64()
 
-					log.Println(T[i].symbol, ask, bid)
+					//log.Println(T[i].symbol, ask, bid)
 
 					if M[T[i].from][T[i].to] != ask || M[T[i].to][T[i].from] != 1.0/bid {
 						M[T[i].from][T[i].to] = ask
