@@ -182,7 +182,7 @@ func main() {
 	}()
 
 	web.Get("/(.*)", hello)
-	web.Run("0.0.0.0:6666")
+	web.Run("0.0.0.0:7777")
 }
 
 func hello(ctx *web.Context, val string) string {
